@@ -3,6 +3,8 @@
 Copied from phython_code/Get2020PierData.py and edited by CVA 
 to remove hardcoded year and make functions more useable 
 
+Implements PierData dataclass for handling Scripps pier data.
+
 MHA SIO221a, 2026-08-24.
 CVA 2026-10-06
 """
@@ -17,7 +19,8 @@ from netCDF4 import Dataset
 
 #SENTINEL = os.path.join('data', f'scripps_pier-{xyear}.nc')
 
-
+#Currently never called because the data is fetched from the URL instead of local files.
+#leaving it in in case I change my mind
 def _find_pier_file(xyear = 2020):
     """Locate data/scripps_pier-{xyear}.nc without hard-coding anyone's home
     directory.  This module knows where IT lives, so the data must be its
@@ -57,12 +60,15 @@ def get_pier_data(xyear = 2020, date_start=None, date_end=None, file=None):
     ----------
     xyear : int, optional
         The year for which to retrieve pier data.
+        Defaults to 2020
     date_start, date_end : numpy datetime64 or str, optional
         Bracket the period you want, e.g. '2020-06-04'.  Omit both to get the
         whole record.
+        BEWARE: Doesn't check that date_start is before date_end or it's in {xyear}'s range.
     file : str, optional
         Path to the netCDF file.  Omit it and we find data/scripps_pier-{xyear}.nc
-        inside the class repo.
+        inside the class repo OR from the URL if not available locally.
+        CURRENTLY ONLY URL IS SUPPORTED.
 
     Returns
     -------
@@ -79,7 +85,10 @@ def get_pier_data(xyear = 2020, date_start=None, date_end=None, file=None):
     #but I didn't want to bother downloading and reorganizing the data.... so I just used the URL...
     #I should clean it up but I will leave the dead parts for now in case I want to change it back
     if file is None:
+        #use this again if downloading the data locally:
         #file = _find_pier_file(xyear=xyear)
+
+        #for grabbing the data from the URL
         file = f'http://sccoos.org/thredds/dodsC/autoss/scripps_pier-{xyear}.nc'
 
     nc = Dataset(file)
