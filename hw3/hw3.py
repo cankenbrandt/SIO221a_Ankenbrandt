@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 import pandas as pd
+from scipy.stats import chi2
 
 
 #Question 1
@@ -115,7 +116,7 @@ n_eff = pd.Series(monthly_mean_buoy_data.index.days_in_month / 7, index=monthly_
 #get that standard error of the mean babbyyyyyy
 monthly_sem_buoy_data = monthly_std_buoy_data.div(np.sqrt(n_eff), axis=0)
 
-#I ended up having to ask Claude for help with data structures in python
+#I ended up having to ask Claude for help with data structures in python for the chunk right above
 #as I accidentally ended up with half data frames and half arrays of some kind
 
 #plot wind speed data monthly averages w errorbars for 2015-2016
@@ -203,4 +204,399 @@ ax7.set_xlabel('year', fontsize=14)
 ax7.set_ylabel('air temperature (°C)', fontsize=14)
 ax7.set_title('NOAA buoy 46047 - Air Temperature 2015 - 2016', fontsize=14)
 ax7.grid(True)
+
+
+#Question 3
+
+#Clean up 2015 and 2016 data
+#convert date columns to datetime format
+buoy_data2015['date'] = pd.to_datetime({'year': buoy_data2015['#YY'], 
+                                    'month': buoy_data2015['MM'], 
+                                    'day': buoy_data2015['DD'], 
+                                    'hour': buoy_data2015['hh'], 
+                                    'minute': buoy_data2015['mm']})
+
+#remove original date columns + set datetime as index
+buoy_data2015.drop(columns=['#YY', 'MM', 'DD', 'hh', 'mm'], inplace=True)
+buoy_data2015.set_index('date', inplace=True)
+
+buoy_data2016['date'] = pd.to_datetime({'year': buoy_data2016['#YY'], 
+                                    'month': buoy_data2016['MM'], 
+                                    'day': buoy_data2016['DD'], 
+                                    'hour': buoy_data2016['hh'], 
+                                    'minute': buoy_data2016['mm']})
+
+#remove original date columns + set datetime as index
+buoy_data2016.drop(columns=['#YY', 'MM', 'DD', 'hh', 'mm'], inplace=True)
+buoy_data2016.set_index('date', inplace=True)
+
+
+# getting monthly means of everything at MonthStart (MS) for plotting
+monthly_mean_buoy_data2015 = buoy_data2015.resample('MS').mean()
+monthly_mean_buoy_data2016 = buoy_data2016.resample('MS').mean()
+
+#chopping off stray months
+monthly_mean_buoy_data2015 = monthly_mean_buoy_data2015.iloc[1:13]
+monthly_mean_buoy_data2016 = monthly_mean_buoy_data2016.iloc[1:13]
+
+#now to the most complicated way to get an array of[0:12]
+time = monthly_mean_buoy_data2015.index.month - monthly_mean_buoy_data2015.index[0].month # type: ignore
+
+
+#let's try to get some leastsquares from 2015
+A = np.column_stack([np.ones_like(time, dtype=float), # type: ignore
+                         time, # type: ignore
+                         np.sin(2*np.pi*time/12), # type: ignore
+                         np.cos(2*np.pi*time/12)])  # type: ignore
+
+
+#2015 WTMP
+x_2015_WTMP, *_ = np.linalg.lstsq(A, monthly_mean_buoy_data2015['WTMP'], rcond=None)
+print("The mean water temp for 2015 is: %.4g" % x_2015_WTMP[0], 
+      "and the total amplitude of the annual cycle is %.4g" % np.sqrt(x_2015_WTMP[2]**2 + x_2015_WTMP[3]**2))
+
+
+#2016 WTMP
+x_2016_WTMP, *_ = np.linalg.lstsq(A, monthly_mean_buoy_data2016['WTMP'], rcond=None)
+print("The mean water temp for 2016 is: %.4g" % x_2016_WTMP[0], 
+      "and the total amplitude of the annual cycle is %.4g" % np.sqrt(x_2016_WTMP[2]**2 + x_2016_WTMP[3]**2))
+
+#2015 ATMP
+x_2015_ATMP, *_ = np.linalg.lstsq(A, monthly_mean_buoy_data2015['ATMP'], rcond=None)
+print("The mean air temp for 2015 is: %.4g" % x_2015_ATMP[0],
+      "and the total amplitude of the annual cycle is %.4g" % np.sqrt(x_2015_ATMP[2]**2 + x_2015_ATMP[3]**2))
+
+#2016 ATMP
+x_2016_ATMP, *_ = np.linalg.lstsq(A, monthly_mean_buoy_data2016['ATMP'], rcond=None)
+print("The mean air temp for 2016 is: %.4g" % x_2016_ATMP[0],
+      "and the total amplitude of the annual cycle is %.4g" % np.sqrt(x_2016_ATMP[2]**2 + x_2016_ATMP[3]**2))
+
+#2015 WSPD
+x_2015_WSPD, *_ = np.linalg.lstsq(A, monthly_mean_buoy_data2015['WSPD'], rcond=None)
+print("The mean wind speed for 2015 is: %.4g" % x_2015_WSPD[0], 
+      "and the total amplitude of the annual cycle is %.4g" % np.sqrt(x_2015_WSPD[2]**2 + x_2015_WSPD[3]**2))
+
+#2016 WSPD
+x_2016_WSPD, *_ = np.linalg.lstsq(A, monthly_mean_buoy_data2016['WSPD'], rcond=None)
+print("The mean wind speed for 2016 is: %.4g" % x_2016_WSPD[0], 
+      "and the total amplitude of the annual cycle is %.4g" % np.sqrt(x_2016_WSPD[2]**2 + x_2016_WSPD[3]**2))
+
+#2015 WVHT
+x_2015_WVHT, *_ = np.linalg.lstsq(A, monthly_mean_buoy_data2015['WVHT'], rcond=None)
+print("The mean wave height for 2015 is: %.4g" % x_2015_WVHT[0], 
+      "and the total amplitude of the annual cycle is %.4g" % np.sqrt(x_2015_WVHT[2]**2 + x_2015_WVHT[3]**2))
+
+#2016 WVHT
+x_2016_WVHT, *_ = np.linalg.lstsq(A, monthly_mean_buoy_data2016['WVHT'], rcond=None)
+print("The mean wave height for 2016 is: %.4g" % x_2016_WVHT[0], 
+      "and the total amplitude of the annual cycle is %.4g" % np.sqrt(x_2016_WVHT[2]**2 + x_2016_WVHT[3]**2))
+
+
+#Question 4
+#I think adding a semiannual cycle, we're going to be dividing by 6 in the sine and cosine terms....
+#okay I shouldve read the whole question first, I just added it above *facepalm*
+A1 = np.column_stack([np.ones_like(time, dtype=float), # type: ignore
+                         time, # type: ignore
+                         np.sin(2*np.pi*time/12), # type: ignore
+                         np.cos(2*np.pi*time/12), # type: ignore
+                         np.sin(2*np.pi*time/6), # type: ignore
+                         np.cos(2*np.pi*time/6)])  # type: ignore
+
+
+#2015 WTMP
+x_2015_WTMP_semi, *_ = np.linalg.lstsq(A1, monthly_mean_buoy_data2015['WTMP'], rcond=None)
+print("The total semiannual amplitude for the water temp for 2015 is: %.4g" % np.sqrt(x_2015_WTMP_semi[4]**2 + x_2015_WTMP_semi[5]**2), 
+      "and the new total amplitude of the annual cycle is %.4g" % np.sqrt(x_2015_WTMP_semi[2]**2 + x_2015_WTMP_semi[3]**2))
+
+
+#2016 WTMP
+x_2016_WTMP_semi, *_ = np.linalg.lstsq(A1, monthly_mean_buoy_data2016['WTMP'], rcond=None)
+print("The total semiannual amplitude for the water temp for 2016 is: %.4g" % np.sqrt(x_2016_WTMP_semi[4]**2 + x_2016_WTMP_semi[5]**2), 
+      "and the new total amplitude of the annual cycle is %.4g" % np.sqrt(x_2016_WTMP_semi[2]**2 + x_2016_WTMP_semi [3]**2))
+
+#2015 ATMP
+x_2015_ATMP_semi, *_ = np.linalg.lstsq(A1, monthly_mean_buoy_data2015['ATMP'], rcond=None)
+print("The total semiannual amplitude for the air temp for 2015 is: %.4g" % np.sqrt(x_2015_ATMP_semi[4]**2 + x_2015_ATMP_semi[5]**2),
+      "and the new total amplitude of the annual cycle is %.4g" % np.sqrt(x_2015_ATMP_semi[2]**2 + x_2015_ATMP_semi[3]**2))
+
+#2016 ATMP
+x_2016_ATMP_semi, *_ = np.linalg.lstsq(A1, monthly_mean_buoy_data2016['ATMP'], rcond=None)
+print("The total semiannual amplitude for the air temp for 2016 is: %.4g" % np.sqrt(x_2016_ATMP_semi[4]**2 + x_2016_ATMP_semi[5]**2),
+      "and the new total amplitude of the annual cycle is %.4g" % np.sqrt(x_2016_ATMP_semi[2]**2 + x_2016_ATMP_semi[3]**2))
+
+#2015 WSPD
+x_2015_WSPD_semi, *_ = np.linalg.lstsq(A1, monthly_mean_buoy_data2015['WSPD'], rcond=None)
+print("The total semiannual amplitude for the wind speed for 2015 is: %.4g" % np.sqrt(x_2015_WSPD_semi[4]**2 + x_2015_WSPD_semi[5]**2), 
+      "and the new total amplitude of the annual cycle is %.4g" % np.sqrt(x_2015_WSPD_semi[2]**2 + x_2015_WSPD_semi[3]**2))
+
+#2016 WSPD
+x_2016_WSPD_semi, *_ = np.linalg.lstsq(A1, monthly_mean_buoy_data2016['WSPD'], rcond=None)
+print("The total semiannual amplitude for the wind speed for 2016 is: %.4g" % np.sqrt(x_2016_WSPD_semi[4]**2 + x_2016_WSPD_semi[5]**2), 
+      "and the new total amplitude of the annual cycle is %.4g" % np.sqrt(x_2016_WSPD_semi[2]**2 + x_2016_WSPD_semi[3]**2))
+
+#2015 WVHT
+x_2015_WVHT_semi, *_ = np.linalg.lstsq(A1, monthly_mean_buoy_data2015['WVHT'], rcond=None)
+print("The total semiannual amplitude for the wave height for 2015 is: %.4g" % np.sqrt(x_2015_WVHT_semi[4]**2 + x_2015_WVHT_semi[5]**2), 
+      "and the new total amplitude of the annual cycle is %.4g" % np.sqrt(x_2015_WVHT_semi[2]**2 + x_2015_WVHT_semi[3]**2))
+
+#2016 WVHT
+x_2016_WVHT_semi, *_ = np.linalg.lstsq(A1, monthly_mean_buoy_data2016['WVHT'], rcond=None)
+print("The total semiannual amplitude for the wave height for 2016 is: %.4g" % np.sqrt(x_2016_WVHT_semi[4]**2 + x_2016_WVHT_semi[5]**2),
+      "and the new total amplitude of the annual cycle is %.4g" % np.sqrt(x_2016_WVHT_semi[2]**2 + x_2016_WVHT_semi[3]**2))
+
+#Question 5
+#I barely understand the frickin question lets try it
+
+#okay I needed more values for 2015 and 2016
+monthly_std_buoy_data2015 = buoy_data2015.resample('MS').std()
+monthly_std_buoy_data2016 = buoy_data2016.resample('MS').std()
+
+n_eff2015 = n_eff[0:12]
+n_eff2016 = n_eff[12:24]
+
+monthly_sem_buoy_data2015 = monthly_std_buoy_data2015.iloc[1:13].div(np.sqrt(n_eff2015), axis=0)
+monthly_sem_buoy_data2016 = monthly_std_buoy_data2016.iloc[1:13].div(np.sqrt(n_eff2016), axis=0)
+
+#getting the misfits
+#2015 WTMP
+misfit_annual_2015_WTMP = ((monthly_mean_buoy_data2015['WTMP'] - (A @ x_2015_WTMP))**2) / ((monthly_sem_buoy_data2015['WTMP'])**2)
+misfit_semiannual_2015_WTMP = ((monthly_mean_buoy_data2015['WTMP'] - (A1 @ x_2015_WTMP_semi))**2) / ((monthly_sem_buoy_data2015['WTMP'])**2)
+misfit_diff_2015_WTMP = misfit_annual_2015_WTMP.sum() - misfit_semiannual_2015_WTMP.sum()
+
+print("Total misfit for 2015 WTMP (annual only): %.4g" % misfit_annual_2015_WTMP.sum())
+print("Total misfit for 2015 WTMP (semiannual included): %.4g" % misfit_semiannual_2015_WTMP.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2015_WTMP)
+
+#2016 WTMP
+misfit_annual_2016_WTMP = ((monthly_mean_buoy_data2016['WTMP'] - (A @ x_2016_WTMP))**2) / ((monthly_sem_buoy_data2016['WTMP'])**2)
+misfit_semiannual_2016_WTMP = ((monthly_mean_buoy_data2016['WTMP'] - (A1 @ x_2016_WTMP_semi))**2) / ((monthly_sem_buoy_data2016['WTMP'])**2)
+misfit_diff_2016_WTMP = misfit_annual_2016_WTMP.sum() - misfit_semiannual_2016_WTMP.sum()
+    
+print("Total misfit for 2016 WTMP (annual only): %.4g" % misfit_annual_2016_WTMP.sum())
+print("Total misfit for 2016 WTMP (semiannual included): %.4g" % misfit_semiannual_2016_WTMP.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2016_WTMP)
+
+#2015 ATMP
+misfit_annual_2015_ATMP = ((monthly_mean_buoy_data2015['ATMP'] - (A @ x_2015_ATMP))**2) / ((monthly_sem_buoy_data2015['ATMP'])**2)
+misfit_semiannual_2015_ATMP = ((monthly_mean_buoy_data2015['ATMP'] - (A1 @ x_2015_ATMP_semi))**2) / ((monthly_sem_buoy_data2015['ATMP'])**2)
+misfit_diff_2015_ATMP = misfit_annual_2015_ATMP.sum() - misfit_semiannual_2015_ATMP.sum()
+
+print("Total misfit for 2015 ATMP (annual only): %.4g" % misfit_annual_2015_ATMP.sum())
+print("Total misfit for 2015 ATMP (semiannual included): %.4g" % misfit_semiannual_2015_ATMP.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2015_ATMP)
+
+#2016 ATMP
+misfit_annual_2016_ATMP = ((monthly_mean_buoy_data2016['ATMP'] - (A @ x_2016_ATMP))**2) / ((monthly_sem_buoy_data2016['ATMP'])**2)
+misfit_semiannual_2016_ATMP = ((monthly_mean_buoy_data2016['ATMP'] - (A1 @ x_2016_ATMP_semi))**2) / ((monthly_sem_buoy_data2016['ATMP'])**2)
+misfit_diff_2016_ATMP = misfit_annual_2016_ATMP.sum() - misfit_semiannual_2016_ATMP.sum()
+
+print("Total misfit for 2016 ATMP (annual only): %.4g" % misfit_annual_2016_ATMP.sum())
+print("Total misfit for 2016 ATMP (semiannual included): %.4g" % misfit_semiannual_2016_ATMP.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2016_ATMP)
+
+#2015 WSPD
+misfit_annual_2015_WSPD = ((monthly_mean_buoy_data2015['WSPD'] - (A @ x_2015_WSPD))**2) / ((monthly_sem_buoy_data2015['WSPD'])**2)
+misfit_semiannual_2015_WSPD = ((monthly_mean_buoy_data2015['WSPD'] - (A1 @ x_2015_WSPD_semi))**2) / ((monthly_sem_buoy_data2015['WSPD'])**2)
+misfit_diff_2015_WSPD = misfit_annual_2015_WSPD.sum() - misfit_semiannual_2015_WSPD.sum()
+
+print("Total misfit for 2015 WSPD (annual only): %.4g" % misfit_annual_2015_WSPD.sum())
+print("Total misfit for 2015 WSPD (semiannual included): %.4g" % misfit_semiannual_2015_WSPD.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2015_WSPD)
+
+#2016 WSPD
+misfit_annual_2016_WSPD = ((monthly_mean_buoy_data2016['WSPD'] - (A @ x_2016_WSPD))**2) / ((monthly_sem_buoy_data2016['WSPD'])**2)
+misfit_semiannual_2016_WSPD = ((monthly_mean_buoy_data2016['WSPD'] - (A1 @ x_2016_WSPD_semi))**2) / ((monthly_sem_buoy_data2016['WSPD'])**2)
+misfit_diff_2016_WSPD = misfit_annual_2016_WSPD.sum() - misfit_semiannual_2016_WSPD.sum()
+
+print("Total misfit for 2016 WSPD (annual only): %.4g" % misfit_annual_2016_WSPD.sum())
+print("Total misfit for 2016 WSPD (semiannual included): %.4g" % misfit_semiannual_2016_WSPD.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2016_WSPD)
+
+
+#2015 WVHT
+misfit_annual_2015_WVHT = ((monthly_mean_buoy_data2015['WVHT'] - (A @ x_2015_WVHT))**2) / ((monthly_sem_buoy_data2015['WVHT'])**2)
+misfit_semiannual_2015_WVHT = ((monthly_mean_buoy_data2015['WVHT'] - (A1 @ x_2015_WVHT_semi))**2) / ((monthly_sem_buoy_data2015['WVHT'])**2)
+misfit_diff_2015_WVHT = misfit_annual_2015_WVHT.sum() - misfit_semiannual_2015_WVHT.sum()
+
+print("Total misfit for 2015 WVHT (annual only): %.4g" % misfit_annual_2015_WVHT.sum())
+print("Total misfit for 2015 WVHT (semiannual included): %.4g" % misfit_semiannual_2015_WVHT.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2015_WVHT)
+
+#2016 WVHT
+misfit_annual_2016_WVHT = ((monthly_mean_buoy_data2016['WVHT'] - (A @ x_2016_WVHT))**2) / ((monthly_sem_buoy_data2016['WVHT'])**2)
+misfit_semiannual_2016_WVHT = ((monthly_mean_buoy_data2016['WVHT'] - (A1 @ x_2016_WVHT_semi))**2) / ((monthly_sem_buoy_data2016['WVHT'])**2)
+misfit_diff_2016_WVHT = misfit_annual_2016_WVHT.sum() - misfit_semiannual_2016_WVHT.sum()
+
+print("Total misfit for 2016 WVHT (annual only): %.4g" % misfit_annual_2016_WVHT.sum())
+print("Total misfit for 2016 WVHT (semiannual included): %.4g" % misfit_semiannual_2016_WVHT.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2016_WVHT)
+
+
+"""
+ax8.plot(time, A @ x_2015_WTMP, 'r', lw=2, label='least squares fit')
+ax8.xaxis.set_major_locator(mdates.YearLocator())
+ax8.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+ax8.xaxis.set_minor_locator(mdates.MonthLocator())
+ax8.xaxis.set_minor_formatter(mdates.DateFormatter('%b'))
+ax8.tick_params(axis='x', which='major', labelsize=12, length=8)
+ax8.tick_params(axis='x', which='minor', labelsize=9) 
+ax8.set_xlim(pd.Timestamp('2014-12-15'), pd.Timestamp('2016-12-31')) # type: ignore
+ax8.set_xlabel('year', fontsize=14)
+ax8.set_ylabel('water temperature (°C)', fontsize=14)
+ax8.set_title('NOAA buoy 46047 - Water Temperature 2015 - 2016', fontsize=14)
+ax8.grid(True)
 plt.show()
+"""
+
+#Now let's look at the chances of the improvement in fit adding the semiannual cycle
+#I was super lost and discovered this method while researching built in chi squared python functions
+
+#2015 WTMP
+chance_above_2015_WTMP = 1 - chi2.cdf(misfit_diff_2015_WTMP, df=2)
+print("Number of values above the improvement in chi2 for 2015 WTMP: %.4g" % chance_above_2015_WTMP)
+
+#2016 WTMP
+chance_above_2016_WTMP = 1 - chi2.cdf(misfit_diff_2016_WTMP, df=2)
+print("Number of values above the improvement in chi2 for 2016 WTMP: %.4g" % chance_above_2016_WTMP)
+
+#2015 ATMP
+chance_above_2015_ATMP = 1 - chi2.cdf(misfit_diff_2015_ATMP, df=2)
+print("Number of values above the improvement in chi2 for 2015 ATMP: %.4g" % chance_above_2015_ATMP)
+
+#2016 ATMP
+chance_above_2016_ATMP = 1 - chi2.cdf(misfit_diff_2016_ATMP, df=2)
+print("Number of values above the improvement in chi2 for 2016 ATMP: %.4g" % chance_above_2016_ATMP)
+
+#2015 WVHT
+chance_above_2015_WVHT = 1 - chi2.cdf(misfit_diff_2015_WVHT, df=2)
+print("Number of values above the improvement in chi2 for 2015 WVHT: %.4g" % chance_above_2015_WVHT)
+
+#2016 WVHT
+chance_above_2016_WVHT = 1 - chi2.cdf(misfit_diff_2016_WVHT, df=2)
+print("Number of values above the improvement in chi2 for 2016 WVHT: %.4g" % chance_above_2016_WVHT)
+
+#2015 WSPD
+chance_above_2015_WSPD = 1 - chi2.cdf(misfit_diff_2015_WSPD, df=2)
+print("Number of values above the improvement in chi2 for 2015 WSPD: %.4g" % chance_above_2015_WSPD)
+
+#2016 WSPD
+chance_above_2016_WSPD = 1 - chi2.cdf(misfit_diff_2016_WSPD, df=2)
+print("Number of values above the improvement in chi2 for 2016 WSPD: %.4g" % chance_above_2016_WSPD)
+
+
+#changing results for one daily independent sample 
+n_daily = pd.Series(monthly_mean_buoy_data.index.days_in_month, index=monthly_mean_buoy_data.index) # type: ignore
+n_daily2015 = n_daily[0:12]
+n_daily2016 = n_daily[12:24]
+
+monthly_sem_buoy_data2015_daily = monthly_std_buoy_data2015.iloc[1:13].div(np.sqrt(n_daily2015), axis=0)
+monthly_sem_buoy_data2016_daily = monthly_std_buoy_data2016.iloc[1:13].div(np.sqrt(n_daily2016), axis=0)
+
+#2015 WTMP
+misfit_annual_2015_WTMP_daily = ((monthly_mean_buoy_data2015['WTMP'] - (A @ x_2015_WTMP))**2) / ((monthly_sem_buoy_data2015_daily['WTMP'])**2)
+misfit_semiannual_2015_WTMP_daily = ((monthly_mean_buoy_data2015['WTMP'] - (A1 @ x_2015_WTMP_semi))**2) / ((monthly_sem_buoy_data2015_daily['WTMP'])**2)
+misfit_diff_2015_WTMP_daily = misfit_annual_2015_WTMP_daily.sum() - misfit_semiannual_2015_WTMP_daily.sum()
+
+print("Total misfit for 2015 WTMP (annual only) using daily independence: %.4g" % misfit_annual_2015_WTMP_daily.sum())
+print("Total misfit for 2015 WTMP (semiannual included) using daily independence: %.4g" % misfit_semiannual_2015_WTMP_daily.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2015_WTMP_daily)
+
+#2016 WTMP
+misfit_annual_2016_WTMP_daily = ((monthly_mean_buoy_data2016['WTMP'] - (A @ x_2016_WTMP))**2) / ((monthly_sem_buoy_data2016_daily['WTMP'])**2)
+misfit_semiannual_2016_WTMP_daily = ((monthly_mean_buoy_data2016['WTMP'] - (A1 @ x_2016_WTMP_semi))**2) / ((monthly_sem_buoy_data2016_daily['WTMP'])**2)
+misfit_diff_2016_WTMP_daily = misfit_annual_2016_WTMP_daily.sum() - misfit_semiannual_2016_WTMP_daily.sum()
+    
+print("Total misfit for 2016 WTMP (annual only) using daily independence: %.4g" % misfit_annual_2016_WTMP_daily.sum())
+print("Total misfit for 2016 WTMP (semiannual included) using daily independence: %.4g" % misfit_semiannual_2016_WTMP_daily.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2016_WTMP_daily)
+
+#2015 ATMP
+misfit_annual_2015_ATMP_daily = ((monthly_mean_buoy_data2015['ATMP'] - (A @ x_2015_ATMP))**2) / ((monthly_sem_buoy_data2015_daily['ATMP'])**2)
+misfit_semiannual_2015_ATMP_daily = ((monthly_mean_buoy_data2015['ATMP'] - (A1 @ x_2015_ATMP_semi))**2) / ((monthly_sem_buoy_data2015_daily['ATMP'])**2)
+misfit_diff_2015_ATMP_daily = misfit_annual_2015_ATMP_daily.sum() - misfit_semiannual_2015_ATMP_daily.sum()
+
+print("Total misfit for 2015 ATMP (annual only) using daily independence: %.4g" % misfit_annual_2015_ATMP_daily.sum())
+print("Total misfit for 2015 ATMP (semiannual included) using daily independence: %.4g" % misfit_semiannual_2015_ATMP_daily.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2015_ATMP_daily)
+
+#2016 ATMP
+misfit_annual_2016_ATMP_daily = ((monthly_mean_buoy_data2016['ATMP'] - (A @ x_2016_ATMP))**2) / ((monthly_sem_buoy_data2016_daily['ATMP'])**2)
+misfit_semiannual_2016_ATMP_daily = ((monthly_mean_buoy_data2016['ATMP'] - (A1 @ x_2016_ATMP_semi))**2) / ((monthly_sem_buoy_data2016_daily['ATMP'])**2)
+misfit_diff_2016_ATMP_daily = misfit_annual_2016_ATMP_daily.sum() - misfit_semiannual_2016_ATMP_daily.sum()
+
+print("Total misfit for 2016 ATMP (annual only) using daily independence: %.4g" % misfit_annual_2016_ATMP_daily.sum())
+print("Total misfit for 2016 ATMP (semiannual included) using daily independence: %.4g" % misfit_semiannual_2016_ATMP_daily.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2016_ATMP_daily)
+
+#2015 WSPD
+misfit_annual_2015_WSPD_daily = ((monthly_mean_buoy_data2015['WSPD'] - (A @ x_2015_WSPD))**2) / ((monthly_sem_buoy_data2015_daily['WSPD'])**2)
+misfit_semiannual_2015_WSPD_daily = ((monthly_mean_buoy_data2015['WSPD'] - (A1 @ x_2015_WSPD_semi))**2) / ((monthly_sem_buoy_data2015_daily['WSPD'])**2)
+misfit_diff_2015_WSPD_daily = misfit_annual_2015_WSPD_daily.sum() - misfit_semiannual_2015_WSPD_daily.sum()
+
+print("Total misfit for 2015 WSPD (annual only) using daily independence: %.4g" % misfit_annual_2015_WSPD_daily.sum())
+print("Total misfit for 2015 WSPD (semiannual included) using daily independence: %.4g" % misfit_semiannual_2015_WSPD_daily.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2015_WSPD_daily)
+
+#2016 WSPD
+misfit_annual_2016_WSPD_daily = ((monthly_mean_buoy_data2016['WSPD'] - (A @ x_2016_WSPD))**2) / ((monthly_sem_buoy_data2016_daily['WSPD'])**2)
+misfit_semiannual_2016_WSPD_daily = ((monthly_mean_buoy_data2016['WSPD'] - (A1 @ x_2016_WSPD_semi))**2) / ((monthly_sem_buoy_data2016_daily['WSPD'])**2)
+misfit_diff_2016_WSPD_daily = misfit_annual_2016_WSPD_daily.sum() - misfit_semiannual_2016_WSPD_daily.sum()
+
+print("Total misfit for 2016 WSPD (annual only) using daily independence: %.4g" % misfit_annual_2016_WSPD_daily.sum())
+print("Total misfit for 2016 WSPD (semiannual included) using daily independence: %.4g" % misfit_semiannual_2016_WSPD_daily.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2016_WSPD_daily)
+
+
+#2015 WVHT
+misfit_annual_2015_WVHT_daily = ((monthly_mean_buoy_data2015['WVHT'] - (A @ x_2015_WVHT))**2) / ((monthly_sem_buoy_data2015_daily['WVHT'])**2)
+misfit_semiannual_2015_WVHT_daily = ((monthly_mean_buoy_data2015['WVHT'] - (A1 @ x_2015_WVHT_semi))**2) / ((monthly_sem_buoy_data2015_daily['WVHT'])**2)
+misfit_diff_2015_WVHT_daily = misfit_annual_2015_WVHT_daily.sum() - misfit_semiannual_2015_WVHT_daily.sum()
+
+print("Total misfit for 2015 WVHT (annual only) using daily independence: %.4g" % misfit_annual_2015_WVHT_daily.sum())
+print("Total misfit for 2015 WVHT (semiannual included) using daily independence: %.4g" % misfit_semiannual_2015_WVHT_daily.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2015_WVHT_daily)
+
+#2016 WVHT
+misfit_annual_2016_WVHT_daily = ((monthly_mean_buoy_data2016['WVHT'] - (A @ x_2016_WVHT))**2) / ((monthly_sem_buoy_data2016_daily['WVHT'])**2)
+misfit_semiannual_2016_WVHT_daily = ((monthly_mean_buoy_data2016['WVHT'] - (A1 @ x_2016_WVHT_semi))**2) / ((monthly_sem_buoy_data2016_daily['WVHT'])**2)
+misfit_diff_2016_WVHT_daily = misfit_annual_2016_WVHT_daily.sum() - misfit_semiannual_2016_WVHT_daily.sum()
+
+print("Total misfit for 2016 WVHT (annual only) using daily independence: %.4g" % misfit_annual_2016_WVHT_daily.sum())
+print("Total misfit for 2016 WVHT (semiannual included) using daily independence: %.4g" % misfit_semiannual_2016_WVHT_daily.sum())
+print("Total improvement in fit adding the semiannual cycle: %.4g" % misfit_diff_2016_WVHT_daily)
+
+#Now let's look at the chances of the improvement in fit adding the semiannual cycle
+#I was super lost and discovered this method while researching built in chi squared python functions
+
+#2015 WTMP
+chance_above_2015_WTMP_daily = 1 - chi2.cdf(misfit_diff_2015_WTMP_daily, df=2)
+print("Number of values above the improvement in chi2 for 2015 WTMP using daily independence: %.4g" % chance_above_2015_WTMP_daily)
+
+#2016 WTMP
+chance_above_2016_WTMP_daily = 1 - chi2.cdf(misfit_diff_2016_WTMP_daily, df=2)
+print("Number of values above the improvement in chi2 for 2016 WTMP using daily independence: %.4g" % chance_above_2016_WTMP_daily)
+
+#2015 ATMP
+chance_above_2015_ATMP_daily = 1 - chi2.cdf(misfit_diff_2015_ATMP_daily, df=2)
+print("Number of values above the improvement in chi2 for 2015 ATMP using daily independence: %.4g" % chance_above_2015_ATMP_daily)
+
+#2016 ATMP
+chance_above_2016_ATMP_daily = 1 - chi2.cdf(misfit_diff_2016_ATMP_daily, df=2)
+print("Number of values above the improvement in chi2 for 2016 ATMP using daily independence: %.4g" % chance_above_2016_ATMP_daily)
+
+#2015 WVHT
+chance_above_2015_WVHT_daily = 1 - chi2.cdf(misfit_diff_2015_WVHT_daily, df=2)
+print("Number of values above the improvement in chi2 for 2015 WVHT using daily independence: %.4g" % chance_above_2015_WVHT_daily)
+
+#2016 WVHT
+chance_above_2016_WVHT_daily = 1 - chi2.cdf(misfit_diff_2016_WVHT_daily, df=2)
+print("Number of values above the improvement in chi2 for 2016 WVHT using daily independence: %.4g" % chance_above_2016_WVHT_daily)
+
+#2015 WSPD
+chance_above_2015_WSPD_daily = 1 - chi2.cdf(misfit_diff_2015_WSPD_daily, df=2)
+print("Number of values above the improvement in chi2 for 2015 WSPD using daily independence: %.4g" % chance_above_2015_WSPD_daily)
+
+#2016 WSPD
+chance_above_2016_WSPD_daily = 1 - chi2.cdf(misfit_diff_2016_WSPD_daily, df=2)
+print("Number of values above the improvement in chi2 for 2016 WSPD using daily independence: %.4g" % chance_above_2016_WSPD_daily)
+
